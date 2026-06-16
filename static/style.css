@@ -49,3 +49,9 @@ button {
 a {
     color: #2563eb;
 }
+.message {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 10px;
+    border-radius: 5px;
+}
