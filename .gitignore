@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 password_manager.db
 .env
+secret.key
+.DS_Store

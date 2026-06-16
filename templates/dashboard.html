@@ -1,11 +1,57 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Dashboard</h1>
+<h1>Secure Password Manager</h1>
 
 <div class="card">
     <h2>Welcome, {{ username }}</h2>
-    <p>You are logged in successfully.</p>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <p class="message">{{ message }}</p>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <h3>Add New Credential</h3>
+
+    <form method="POST" action="/add">
+        <label>Website</label>
+        <input type="text" name="website" placeholder="Example: Gmail" required>
+
+        <label>Account Username / Email</label>
+        <input type="text" name="account_username" placeholder="Example: feroz@gmail.com" required>
+
+        <label>Password</label>
+        <input type="text" name="password" placeholder="Enter or generate password" required>
+
+        <label>Notes</label>
+        <input type="text" name="notes" placeholder="Optional note">
+
+        <button type="submit">Save Credential</button>
+    </form>
+
+    <hr>
+
+    <h3>Saved Credentials</h3>
+
+    {% if credentials %}
+        {% for item in credentials %}
+            <div class="credential-box">
+                <p><strong>Website:</strong> {{ item.website }}</p>
+                <p><strong>Username:</strong> {{ item.account_username }}</p>
+                <p><strong>Password:</strong> {{ item.password }}</p>
+                <p><strong>Notes:</strong> {{ item.notes }}</p>
+
+                <form method="POST" action="/delete/{{ item.id }}">
+                    <button type="submit" class="delete-btn">Delete</button>
+                </form>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>No credentials saved yet.</p>
+    {% endif %}
 
     <p><a href="/logout">Logout</a></p>
 </div>

@@ -1,11 +1,35 @@
+import os
 import sqlite3
 from flask import Flask, render_template, request, redirect, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
+from cryptography.fernet import Fernet
 
 app = Flask(__name__)
 app.secret_key = "change-this-secret-key-later"
 
 DB_NAME = "password_manager.db"
+KEY_FILE = "secret.key"
+
+
+def load_or_create_key():
+    if not os.path.exists(KEY_FILE):
+        key = Fernet.generate_key()
+        with open(KEY_FILE, "wb") as key_file:
+            key_file.write(key)
+
+    with open(KEY_FILE, "rb") as key_file:
+        return key_file.read()
+
+
+cipher = Fernet(load_or_create_key())
+
+
+def encrypt_text(text):
+    return cipher.encrypt(text.encode()).decode()
+
+
+def decrypt_text(encrypted_text):
+    return cipher.decrypt(encrypted_text.encode()).decode()
 
 
 def get_db_connection():
@@ -22,6 +46,18 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS credentials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            website TEXT NOT NULL,
+            account_username TEXT NOT NULL,
+            encrypted_password TEXT NOT NULL,
+            notes TEXT,
+            FOREIGN KEY (user_id) REFERENCES users (id)
         )
     """)
 
@@ -100,7 +136,77 @@ def dashboard():
     if "user_id" not in session:
         return redirect("/login")
 
-    return render_template("dashboard.html", username=session["username"])
+    conn = get_db_connection()
+    rows = conn.execute(
+        "SELECT * FROM credentials WHERE user_id = ? ORDER BY id DESC",
+        (session["user_id"],)
+    ).fetchall()
+    conn.close()
+
+    credentials = []
+    for row in rows:
+        credentials.append({
+            "id": row["id"],
+            "website": row["website"],
+            "account_username": row["account_username"],
+            "password": decrypt_text(row["encrypted_password"]),
+            "notes": row["notes"]
+        })
+
+    return render_template(
+        "dashboard.html",
+        username=session["username"],
+        credentials=credentials
+    )
+
+
+@app.route("/add", methods=["POST"])
+def add_credential():
+    if "user_id" not in session:
+        return redirect("/login")
+
+    website = request.form["website"].strip()
+    account_username = request.form["account_username"].strip()
+    password = request.form["password"]
+    notes = request.form["notes"].strip()
+
+    if not website or not account_username or not password:
+        flash("Website, username, and password are required.")
+        return redirect("/dashboard")
+
+    encrypted_password = encrypt_text(password)
+
+    conn = get_db_connection()
+    conn.execute(
+        """
+        INSERT INTO credentials
+        (user_id, website, account_username, encrypted_password, notes)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (session["user_id"], website, account_username, encrypted_password, notes)
+    )
+    conn.commit()
+    conn.close()
+
+    flash("Credential saved securely.")
+    return redirect("/dashboard")
+
+
+@app.route("/delete/<int:credential_id>", methods=["POST"])
+def delete_credential(credential_id):
+    if "user_id" not in session:
+        return redirect("/login")
+
+    conn = get_db_connection()
+    conn.execute(
+        "DELETE FROM credentials WHERE id = ? AND user_id = ?",
+        (credential_id, session["user_id"])
+    )
+    conn.commit()
+    conn.close()
+
+    flash("Credential deleted.")
+    return redirect("/dashboard")
 
 
 @app.route("/logout")
