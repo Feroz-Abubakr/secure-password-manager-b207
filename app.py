@@ -1,11 +1,20 @@
 import os
 import sqlite3
+import secrets
+import string
 from flask import Flask, render_template, request, redirect, flash, session
+from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 from cryptography.fernet import Fernet
 
 app = Flask(__name__)
 app.secret_key = "change-this-secret-key-later"
+
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = False
+
+csrf = CSRFProtect(app)
 
 DB_NAME = "password_manager.db"
 KEY_FILE = "secret.key"
@@ -206,6 +215,18 @@ def delete_credential(credential_id):
     conn.close()
 
     flash("Credential deleted.")
+    return redirect("/dashboard")
+
+
+@app.route("/generate-password")
+def generate_password():
+    if "user_id" not in session:
+        return redirect("/login")
+
+    characters = string.ascii_letters + string.digits + "!@#$%^&*()-_=+"
+    generated_password = "".join(secrets.choice(characters) for _ in range(16))
+
+    flash(f"Generated password: {generated_password}")
     return redirect("/dashboard")
 
 
