@@ -6,7 +6,7 @@ from flask import Flask, render_template, request, redirect, flash, session
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
 from cryptography.fernet import Fernet
-
+#It is important to notee that the secret should be kept secret.
 app = Flask(__name__)
 app.secret_key = "change-this-secret-key-later"
 
@@ -19,7 +19,7 @@ csrf = CSRFProtect(app)
 DB_NAME = "password_manager.db"
 KEY_FILE = "secret.key"
 
-
+# Load or create encryption key.
 def load_or_create_key():
     if not os.path.exists(KEY_FILE):
         key = Fernet.generate_key()
@@ -29,7 +29,7 @@ def load_or_create_key():
     with open(KEY_FILE, "rb") as key_file:
         return key_file.read()
 
-
+# Initialize the Fernet cipher with the loaded or created key.
 cipher = Fernet(load_or_create_key())
 
 
@@ -45,7 +45,7 @@ def get_db_connection():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn
-
+# Initialize the database and create tables if they don't exist.
 
 def init_db():
     conn = get_db_connection()
@@ -73,14 +73,14 @@ def init_db():
     conn.commit()
     conn.close()
 
-
+# Routes
 @app.route("/")
 def home():
     if "user_id" in session:
         return redirect("/dashboard")
     return redirect("/login")
 
-
+# Login route
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -104,7 +104,7 @@ def login():
 
     return render_template("login.html")
 
-
+# Registration route
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
@@ -139,7 +139,7 @@ def register():
 
     return render_template("register.html")
 
-
+# Dashboard route
 @app.route("/dashboard")
 def dashboard():
     if "user_id" not in session:
@@ -151,7 +151,7 @@ def dashboard():
         (session["user_id"],)
     ).fetchall()
     conn.close()
-
+# Decrypt the passwords before sending them to the template.
     credentials = []
     for row in rows:
         credentials.append({
@@ -168,7 +168,7 @@ def dashboard():
         credentials=credentials
     )
 
-
+# Add credential route
 @app.route("/add", methods=["POST"])
 def add_credential():
     if "user_id" not in session:
